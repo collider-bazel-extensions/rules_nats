@@ -1,0 +1,6 @@
+"""Maintainer-render values for the NATS chart. Consumed only by
+//tools:render_nats_<ver> at maintainer time."""
+
+package(default_visibility = ["//tools:__pkg__"])
+
+exports_files(["nats-values.yaml"])

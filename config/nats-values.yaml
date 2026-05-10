@@ -1,0 +1,15 @@
+# Values overlaid at maintainer-render time over the chart's
+# defaults. The chart 2.12.x defaults JetStream to *disabled*
+# (`config.jetstream.enabled: false`); enable it here so the
+# committed manifest is JetStream-capable out of the box. Most
+# production NATS deploys want JetStream — consumers who don't
+# can re-render with their own values, or override via kustomize
+# / kubectl-patch over the install macro.
+config:
+  jetstream:
+    enabled: true
+    fileStore:
+      enabled: true
+      pvc:
+        # Smoke fixture sizing — production should bump.
+        size: 1Gi

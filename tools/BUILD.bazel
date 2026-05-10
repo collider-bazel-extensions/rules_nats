@@ -27,6 +27,7 @@ exports_files([
 helm_template(
     name = "render_nats_2_12_6",
     chart = ["@nats_chart_2_12_6//:files"],
+    values = ["//config:nats-values.yaml"],
     namespace = "nats",
     release_name = "nats",
     include_crds = True,

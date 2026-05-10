@@ -44,6 +44,11 @@ data:
   nats.conf: |
     {
       "http_port": 8222,
+      "jetstream": {
+        "max_file_store": 1Gi,
+        "max_memory_store": 0,
+        "store_dir": "/data"
+      },
       "lame_duck_duration": "30s",
       "lame_duck_grace_period": "10s",
       "pid_file": "/var/run/nats/nats.pid",
@@ -264,6 +269,8 @@ spec:
           name: config
         - mountPath: /var/run/nats
           name: pid
+        - mountPath: /data
+          name: nats-js
       - args:
         - -pid
         - /var/run/nats/nats.pid
@@ -285,7 +292,15 @@ spec:
         name: config
       - emptyDir: {}
         name: pid
-  volumeClaimTemplates: null
+  volumeClaimTemplates:
+  - metadata:
+      name: nats-js
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
 ---
 # Source: nats/templates/tests/request-reply.yaml
 apiVersion: v1
