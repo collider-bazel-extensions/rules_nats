@@ -33,12 +33,26 @@ echo "smoke: waiting for $NATS_BOX_DEPLOY Deployment Available"
 "${KCTL[@]}" -n "$NS" wait "deploy/$NATS_BOX_DEPLOY" \
     --for=condition=Available --timeout=180s
 
-# Pick the nats-box pod name.
+# Pick the nats-box pod name. The chart labels nats-box pods with
+# `app.kubernetes.io/component=nats-box` (the `name` label is `nats`
+# for both the StatefulSet pods and the nats-box pods — using `name`
+# alone matches both, returning a non-deterministic first index).
 box_pod=$("${KCTL[@]}" -n "$NS" get pod \
-    -l "app.kubernetes.io/name=nats-box" \
+    -l "app.kubernetes.io/component=nats-box" \
     -o jsonpath='{.items[0].metadata.name}')
-[[ -n "$box_pod" ]] || { echo "smoke: FAIL — no nats-box pod found" >&2; exit 1; }
+[[ -n "$box_pod" ]] || {
+  echo "smoke: FAIL — no nats-box pod found via component=nats-box" >&2
+  "${KCTL[@]}" -n "$NS" get pods --show-labels >&2 || true
+  exit 1
+}
 echo "smoke: nats-box pod: $box_pod"
+
+# Pod may be Running but not yet "Ready" (the chart's nats-box
+# container takes a few seconds to finish its init script). Wait for
+# Ready before kubectl-exec — otherwise nats CLI calls race the pod
+# startup.
+echo "smoke: waiting for $box_pod Ready"
+"${KCTL[@]}" -n "$NS" wait "pod/$box_pod" --for=condition=Ready --timeout=120s
 
 KEXEC=("${KCTL[@]}" -n "$NS" exec "$box_pod" -c nats-box --)
 
