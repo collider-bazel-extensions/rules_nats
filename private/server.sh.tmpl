@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# nats_server launcher. Substitution markers use __KEY__ syntax to
+# avoid colliding with bash ${VAR} expansion.
+set -euo pipefail
+
+# Resolve the runfiles tree. Set under both `bazel run` (RUNFILES_DIR)
+# and `bazel test` wrapping (TEST_SRCDIR — propagates to children).
+if [[ -z "${RUNFILES_DIR:-}" ]]; then
+  if [[ -n "${TEST_SRCDIR:-}" ]]; then
+    RUNFILES_DIR="$TEST_SRCDIR"
+  elif [[ -d "${0}.runfiles" ]]; then
+    RUNFILES_DIR="${0}.runfiles"
+  elif [[ -d "$(dirname "$0").runfiles" ]]; then
+    RUNFILES_DIR="$(dirname "$0").runfiles"
+  fi
+  export RUNFILES_DIR
+fi
+
+resolve() {
+  local p="$1"
+  if [[ -e "${RUNFILES_DIR}/_main/${p}" ]]; then
+    printf '%s\n' "${RUNFILES_DIR}/_main/${p}"
+  elif [[ -e "${RUNFILES_DIR}/${p}" ]]; then
+    printf '%s\n' "${RUNFILES_DIR}/${p}"
+  else
+    # Search across all repos in runfiles — handles the case where
+    # the binary lives under @@+nats+nats_<ver>_<plat>/...
+    local hit
+    hit=$(find "${RUNFILES_DIR}" -path "*/${p}" -type f 2>/dev/null | head -n1)
+    if [[ -n "$hit" ]]; then
+      printf '%s\n' "$hit"
+    else
+      echo "nats_server: input not in runfiles: ${p}" >&2
+      exit 1
+    fi
+  fi
+}
+
+NATS_SERVER="$(resolve '__NATS_SERVER_BIN__')"
+ENV_FILE_NAME='__ENV_FILE_NAME__'
+JETSTREAM='__JETSTREAM__'
+
+state_dir="${TEST_TMPDIR:-/tmp}/nats-server-${ENV_FILE_NAME%.env}"
+mkdir -p "$state_dir"
+env_file="${TEST_TMPDIR:-/tmp}/${ENV_FILE_NAME}"
+
+# Pick a free port. Bind-ephemeral-then-close: small TOCTOU race
+# window exists, but nats-server retries on EADDRINUSE and the
+# launcher's polling loop will catch it. Same trade rules_pg makes.
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
+
+conf="${state_dir}/nats-server.conf"
+{
+  echo "host: \"127.0.0.1\""
+  echo "port: ${port}"
+  echo "http_port: 0"
+  if [[ "$JETSTREAM" == "true" ]]; then
+    echo "jetstream {"
+    echo "  store_dir: \"${state_dir}/js\""
+    echo "}"
+  fi
+} > "$conf"
+
+echo "[nats_server] starting on 127.0.0.1:${port} (jetstream=${JETSTREAM})" >&2
+"$NATS_SERVER" -c "$conf" >> "${state_dir}/nats.log" 2>&1 &
+server_pid=$!
+
+cleanup() {
+  if [[ -n "${server_pid:-}" ]] && kill -0 "$server_pid" 2>/dev/null; then
+    kill -TERM "$server_pid" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 "$server_pid" 2>/dev/null || break
+      sleep 0.5
+    done
+    kill -KILL "$server_pid" 2>/dev/null || true
+  fi
+  rm -f "$env_file"
+}
+trap cleanup EXIT INT TERM
+
+# Poll until the server accepts a TCP connect. nats-server accepts
+# connections in well under a second on warm caches; 30s deadline
+# covers cold-start margin without being a footgun.
+deadline=$(( $(date +%s) + 30 ))
+while (( $(date +%s) < deadline )); do
+  if (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then break; fi
+  if ! kill -0 "$server_pid" 2>/dev/null; then
+    echo "[nats_server] FAIL — server exited before accepting connections" >&2
+    cat "${state_dir}/nats.log" >&2 || true
+    exit 1
+  fi
+  sleep 0.2
+done
+if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
+  echo "[nats_server] FAIL — timed out waiting for 127.0.0.1:${port}" >&2
+  cat "${state_dir}/nats.log" >&2 || true
+  exit 1
+fi
+
+# Atomic env-file write: write to .tmp then rename. Same pattern
+# rules_pg uses — a partial read of a half-written file would be a
+# race against nats_health_check.
+tmp="${env_file}.tmp"
+{
+  echo "NATS_URL=nats://127.0.0.1:${port}"
+  echo "NATS_HOST=127.0.0.1"
+  echo "NATS_PORT=${port}"
+} > "$tmp"
+mv "$tmp" "$env_file"
+echo "[nats_server] ready; env file: $env_file" >&2
+
+# Wait for SIGTERM. rules_itest sends it during teardown; bazel test
+# tears down children when the test exits.
+wait "$server_pid"

@@ -1,0 +1,71 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  hermetic_server:
+    name: bazel test (ubuntu-latest, hermetic server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-hermetic
+          repository-cache: true
+
+      # `bazel build //...` would analyze cross-platform binary repos
+      # that can't materialize on a linux runner (the darwin tarballs
+      # would fail sha-mismatch). Target specific paths — same lesson
+      # rules_temporal v0.3 / rules_atlas learned.
+      - name: bazel build (smoke targets)
+        run: |
+          bazel build \
+            //tests:pubsub_test \
+            //tests/install_smoke:smoke_test
+
+      - name: bazel test (hermetic-server pubsub)
+        run: bazel test //tests:pubsub_test --test_output=errors
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazel-testlogs-hermetic
+          path: bazel-testlogs/
+          if-no-files-found: ignore
+
+  install_smoke:
+    # Cluster install smoke: kind + nats Helm chart + JetStream
+    # pub/consume round-trip via kubectl-exec'd nats-box.
+    name: install smoke (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-install-smoke
+          repository-cache: true
+
+      - name: Verify Docker is available
+        run: docker version
+
+      - name: bazel test //tests/install_smoke:smoke_test
+        # kind boot (~30s) + nats chart apply (~30s) + sts/nats
+        # rollout (image pull ~30MB, ~60s on cold) + smoke
+        # exec/publish/consume (~5s).
+        run: bazel test //tests/install_smoke:smoke_test --test_output=streamed --test_timeout=900
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazel-testlogs-install-smoke
+          path: bazel-testlogs/
+          if-no-files-found: ignore

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# nats_health_check — exits 0 iff the paired nats_server has written
+# its env file. Probes are cheap; the env-file presence is the
+# single-point-of-truth that nats-server's TCP listener has come up.
+set -euo pipefail
+
+ENV_FILE_NAME='__ENV_FILE_NAME__'
+env_file="${TEST_TMPDIR:-/tmp}/${ENV_FILE_NAME}"
+
+if [[ -f "$env_file" ]]; then
+  exit 0
+fi
+echo "[nats_health_check] env file not yet present: $env_file" >&2
+exit 1

@@ -1,0 +1,9 @@
+"""In-tree tests for rules_nats's hermetic-server primitives."""
+
+load("@rules_nats//:defs.bzl", "nats_test")
+
+# JetStream pub/consume round-trip against an auto-launched nats_server.
+nats_test(
+    name = "pubsub_test",
+    srcs = ["pubsub_test.sh"],
+)

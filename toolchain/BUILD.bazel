@@ -1,0 +1,83 @@
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load(":toolchain.bzl", "nats_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["toolchain.bzl"])
+
+toolchain_type(name = "nats")
+
+# Per-platform toolchains. Each `nats_<ver>_<plat>` repo (created by
+# the module extension) ships both the nats-server and nats CLI for
+# one platform; the toolchain selects the right repo based on the
+# resolved exec platform.
+
+nats_toolchain(
+    name            = "nats_linux_amd64_impl",
+    server_version  = "2.14.0",
+    cli_version     = "0.4.0",
+    nats_server_bin = "@nats_2_14_0_linux_amd64//:nats_server_bin",
+    nats_cli_bin    = "@nats_2_14_0_linux_amd64//:nats_cli_bin",
+)
+
+toolchain(
+    name                   = "nats_linux_amd64",
+    toolchain_type         = ":nats",
+    exec_compatible_with   = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+    toolchain              = ":nats_linux_amd64_impl",
+)
+
+nats_toolchain(
+    name            = "nats_linux_arm64_impl",
+    server_version  = "2.14.0",
+    cli_version     = "0.4.0",
+    nats_server_bin = "@nats_2_14_0_linux_arm64//:nats_server_bin",
+    nats_cli_bin    = "@nats_2_14_0_linux_arm64//:nats_cli_bin",
+)
+
+toolchain(
+    name                   = "nats_linux_arm64",
+    toolchain_type         = ":nats",
+    exec_compatible_with   = ["@platforms//os:linux", "@platforms//cpu:arm64"],
+    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:arm64"],
+    toolchain              = ":nats_linux_arm64_impl",
+)
+
+nats_toolchain(
+    name            = "nats_darwin_amd64_impl",
+    server_version  = "2.14.0",
+    cli_version     = "0.4.0",
+    nats_server_bin = "@nats_2_14_0_darwin_amd64//:nats_server_bin",
+    nats_cli_bin    = "@nats_2_14_0_darwin_amd64//:nats_cli_bin",
+)
+
+toolchain(
+    name                   = "nats_darwin_amd64",
+    toolchain_type         = ":nats",
+    exec_compatible_with   = ["@platforms//os:osx", "@platforms//cpu:x86_64"],
+    target_compatible_with = ["@platforms//os:osx", "@platforms//cpu:x86_64"],
+    toolchain              = ":nats_darwin_amd64_impl",
+)
+
+nats_toolchain(
+    name            = "nats_darwin_arm64_impl",
+    server_version  = "2.14.0",
+    cli_version     = "0.4.0",
+    nats_server_bin = "@nats_2_14_0_darwin_arm64//:nats_server_bin",
+    nats_cli_bin    = "@nats_2_14_0_darwin_arm64//:nats_cli_bin",
+)
+
+toolchain(
+    name                   = "nats_darwin_arm64",
+    toolchain_type         = ":nats",
+    exec_compatible_with   = ["@platforms//os:osx", "@platforms//cpu:arm64"],
+    target_compatible_with = ["@platforms//os:osx", "@platforms//cpu:arm64"],
+    toolchain              = ":nats_darwin_arm64_impl",
+)
+
+bzl_library(
+    name = "toolchain",
+    srcs = ["toolchain.bzl"],
+    deps = ["//private:providers"],
+)
