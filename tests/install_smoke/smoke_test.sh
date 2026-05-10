@@ -56,10 +56,14 @@ echo "smoke: waiting for $box_pod Ready"
 
 KEXEC=("${KCTL[@]}" -n "$NS" exec "$box_pod" -c nats-box --)
 
-# 1. Add a JetStream stream named SMOKE on `smoke.>`.
+# 1. Add a JetStream stream named SMOKE on `smoke.>`. Use file
+# storage — the chart's memoryStore is disabled by default (only
+# fileStore is enabled by our values overlay), so `--storage memory`
+# trips "insufficient memory resources available (10028)". File
+# storage uses the PVC the chart provisions.
 "${KEXEC[@]}" nats --server "$SERVER_URL" stream add SMOKE \
     --subjects 'smoke.>' \
-    --storage memory \
+    --storage file \
     --retention limits \
     --discard old \
     --max-msgs=-1 \
