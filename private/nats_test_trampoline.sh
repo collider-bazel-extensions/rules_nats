@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # nats_test trampoline — launches nats_server in the background,
-# polls for its env file, sources NATS_URL et al, exec's the user's
-# inner sh_binary.
+# polls for its env file, sources NATS_URL et al, runs the user's
+# inner sh_binary with the target's args, then stops the server.
 #
-# Argv: <server_short_path> <inner_short_path> <server_target_name>
+# Argv: <server_short_path> <inner_short_path> <server_target_name> [user args...]
 set -euo pipefail
 
 SERVER_SHORT="$1"
 INNER_SHORT="$2"
 SERVER_NAME="$3"
+shift 3  # the rest are the target's args, for the user's test
 
 if [[ -z "${TEST_TMPDIR:-}" ]]; then
   echo "nats_test: TEST_TMPDIR not set (expected under bazel test)" >&2
@@ -46,7 +47,10 @@ cleanup() {
     wait "$server_pid" 2>/dev/null || true
   fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # Server's own deadline is 30s; give the trampoline a hair more.
 deadline=$(( $(date +%s) + 35 ))
@@ -76,4 +80,6 @@ if [[ -n "$nats_cli_path" ]]; then
   export NATS_CLI="$nats_cli_path"
 fi
 
-exec "$test_bin" "$@"
+# Not exec: the EXIT trap must stop the server when the test ends (exec
+# would drop it and leave nats-server running outside `bazel test`).
+"$test_bin" "$@"

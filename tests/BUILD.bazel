@@ -1,9 +1,42 @@
 """In-tree tests for rules_nats's hermetic-server primitives."""
 
 load("@rules_nats//:defs.bzl", "nats_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 # JetStream pub/consume round-trip against an auto-launched nats_server.
 nats_test(
     name = "pubsub_test",
     srcs = ["pubsub_test.sh"],
+)
+
+# The target's args reach the test, without the trampoline's own.
+nats_test(
+    name = "args_test",
+    srcs = ["args_test.sh"],
+    args = ["one", "'two words'"],
+)
+
+# server_cleanup_test runs this nats_test's trampoline directly and checks
+# the server is gone afterwards.
+nats_test(
+    name = "record_port",
+    srcs = ["record_port.sh"],
+    jetstream = False,
+    tags = ["manual"],
+)
+
+sh_test(
+    name = "server_cleanup_test",
+    srcs = ["server_cleanup_test.sh"],
+    args = [
+        "$(rootpath //private:nats_test_trampoline.sh)",
+        "$(rootpath :record_port_nats_server)",
+        "$(rootpath :record_port_inner)",
+        "record_port_nats_server",
+    ],
+    data = [
+        ":record_port_inner",
+        ":record_port_nats_server",
+        "//private:nats_test_trampoline.sh",
+    ],
 )

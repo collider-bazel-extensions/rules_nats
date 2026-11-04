@@ -18,7 +18,7 @@ Pinned: nats-server v2.14.0, nats CLI v0.4.0, NATS Helm chart 2.12.6.
 
 module(
     name = "rules_nats",
-    version = "0.1.0",
+    version = "0.1.1",
 )
 
 bazel_dep(name = "bazel_skylib", version = "1.8.2")

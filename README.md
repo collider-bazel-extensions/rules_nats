@@ -5,7 +5,7 @@ Bazel rules for [NATS](https://nats.io) — high-performance pub/sub + JetStream
 - **Hermetic server (test-time):**
   - `nats_server` — long-running `nats-server` fixture; writes `$TEST_TMPDIR/<name>.env` with `NATS_URL` once accepting connections.
   - `nats_health_check` — pairs with `nats_server` for `itest_service` compositions.
-  - `nats_test` — sh_test macro that auto-launches a `nats_server` and exec's the user test with `NATS_URL` (and `$NATS_CLI` pointing at the toolchain's `nats` CLI) in env.
+  - `nats_test` — sh_test macro that auto-launches a `nats_server` and runs the user test (with the target's `args`) with `NATS_URL` (and `$NATS_CLI` pointing at the toolchain's `nats` CLI) in env.
 - **Cluster install (kind / production):**
   - `nats_install` — applies the pinned NATS Helm chart, waits for `sts/nats` rollout.
   - `nats_install_health_check` — paired readiness probe.
@@ -13,7 +13,7 @@ Bazel rules for [NATS](https://nats.io) — high-performance pub/sub + JetStream
 ## Install (Bzlmod)
 
 ```python
-bazel_dep(name = "rules_nats", version = "0.1.0")
+bazel_dep(name = "rules_nats", version = "0.1.1")
 
 nats = use_extension("@rules_nats//:extensions.bzl", "nats")
 nats.version(version = "2.14.0", cli_version = "0.4.0")
@@ -38,7 +38,8 @@ load("@rules_nats//:defs.bzl", "nats_test")
 
 # Run a sh_test against an auto-launched nats_server.
 # The trampoline exports NATS_URL / NATS_HOST / NATS_PORT and
-# $NATS_CLI before exec'ing the inner test.
+# $NATS_CLI, runs the inner test with the target's args, then stops
+# the server.
 nats_test(
     name = "pubsub_test",
     srcs = ["pubsub_test.sh"],
