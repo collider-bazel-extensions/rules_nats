@@ -1,11 +1,11 @@
 """nats_test — sh_test macro that auto-launches a nats_server in the
-background and exec's the user's test with NATS_URL etc. in env.
+background and runs the user's test with NATS_URL etc. in env.
 
 Each `nats_test` target gets:
   - Its own `nats_server` (target-name-suffixed → unique env file).
   - A static trampoline that launches the server, waits for its env
-    file, sources NATS_URL / NATS_HOST / NATS_PORT, exec's the user's
-    test binary.
+    file, sources NATS_URL / NATS_HOST / NATS_PORT, runs the user's
+    test binary with the target's `args`, then stops the server.
 
 No shared state between tests → safe under `--jobs=N` parallelism.
 Mirrors `rules_pg`'s `pg_test` shape.
@@ -25,6 +25,7 @@ def nats_test(
         tags = None,
         jetstream = True,
         env = None,
+        args = None,
         **kwargs):
     """sh_test that auto-launches a nats_server in the background.
 
@@ -39,6 +40,8 @@ def nats_test(
       tags: sh_test tags.
       jetstream: enable JetStream on the auto-launched server (default True).
       env: forwarded to sh_test (the wrapper sets NATS_URL on top).
+      args: arguments for the user's test script (after the trampoline's
+        own, which it removes).
       **kwargs: forwarded to sh_test.
     """
 
@@ -65,7 +68,7 @@ def nats_test(
             "$(rootpath :{})".format(server_name),
             "$(rootpath :{})".format(inner_name),
             server_name,  # env-file basename = <server target name>.env
-        ],
+        ] + (args or []),
         data = [
             ":" + server_name,
             ":" + inner_name,

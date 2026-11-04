@@ -30,7 +30,9 @@ The trampoline is a static script in `private/`. The macro emits:
 
 1. A `nats_server` target (UUID-suffixed by parent test name → unique env file).
 2. An inner `sh_binary` carrying the user's test logic.
-3. A `sh_test` whose `srcs` is the trampoline; `args` pass the server short_path + inner short_path + server target name. The trampoline launches the server, polls the env file, sources it, exec's the inner.
+3. A `sh_test` whose `srcs` is the trampoline; `args` pass the server short_path + inner short_path + server target name. The trampoline launches the server, polls the env file, sources it, then runs the inner test with the remaining arguments (the target's `args`; it `shift`s its own three off first) and stops the server on exit.
+
+It deliberately does not `exec` the inner test: `exec` would drop the trampoline's EXIT trap, leaving nats-server running whenever the test is run outside `bazel test` (which otherwise cleans up by killing the process group). Before v0.1.1 the trampoline did `exec "$test_bin" "$@"` without shifting, so the user's test received the server path, its own path and the server name as its first three arguments, and a target-level `args` was a Starlark error (the macro set `args` itself and forwarded `**kwargs`). `//tests:args_test` and `//tests:server_cleanup_test` cover both.
 
 Trampoline also exports `$NATS_CLI` (resolved from runfiles) so consumer tests can shell out to the toolchain CLI without re-resolving it.
 
