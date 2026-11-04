@@ -31,7 +31,7 @@ jobs:
             //tests:server_cleanup_test \
             //tests/install_smoke:smoke_test
 
-      - name: bazel test (hermetic server: pubsub, args, cleanup)
+      - name: "bazel test (hermetic server: pubsub, args, cleanup)"
         run: bazel test //tests:pubsub_test //tests:args_test //tests:server_cleanup_test --test_output=errors
 
       - name: Upload test logs on failure
