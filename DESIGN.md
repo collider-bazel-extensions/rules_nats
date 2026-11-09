@@ -52,6 +52,14 @@ NATS publishes the chart as a packaged `.tgz` at the GitHub release (`github.com
 
 The chart deploys a `nats-box` Deployment (a small sidecar pod with the `nats` CLI baked in). The smoke `kubectl exec`s into that pod for the JetStream pub/consume round-trip — no need to mount the host CLI, and the CLI lives in the same network namespace as the server.
 
+## Extension tag selection (v0.1.2)
+
+The `nats` extension runs once for the whole build and sees every module's tags, but the `@nats_<ver>_<plat>` repos are global, so each is created once. rules_nats's own `nats.version()` always applies, because its `MODULE.bazel` imports that version's repos and registers the toolchain for every consumer; the root module's tags override it per server version and may add versions; other modules' tags are ignored. Through v0.1.1 only the root's tags were honoured, so a root without `nats.version()` failed with `does not generate repository "nats_2_14_0_linux_amd64"` (same bug as rules_atlas#12). Repeating an identical tag is fine; one module giving a server version two CLI versions, or an unsupported version, fails naming `nats.version`. CI's `consumer` job (`.github/consumer/check.sh`) checks these from the commit's `git archive`, running a `nats_test` against the default server.
+
+## Release archive contents (v0.1.2)
+
+`tests/` and `tools/` are `export-ignore` (`.gitattributes`): their packages load dev-only modules (`rules_itest`, `rules_kind`, `rules_helm`), which made `@rules_nats//...` unloadable for consumers. `REPO.bazel` `ignore_directories` would also hide them from this repo's own tests. A `git_override` clone still contains them.
+
 ## What this repo does not (yet) do
 
 - **NACK** — the JetStream-CRDs operator (Stream / Consumer / KeyValue / ObjectStore as Kubernetes CRs) at https://github.com/nats-io/nack. Out of scope for v0.1's surface; v0.2 candidate. Consumers can apply the NACK manifest separately while `nats_install` provides the server.

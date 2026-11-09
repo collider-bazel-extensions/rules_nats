@@ -13,23 +13,24 @@ Bazel rules for [NATS](https://nats.io) — high-performance pub/sub + JetStream
 ## Install (Bzlmod)
 
 ```python
-bazel_dep(name = "rules_nats", version = "0.1.1")
-
-nats = use_extension("@rules_nats//:extensions.bzl", "nats")
-nats.version(version = "2.14.0", cli_version = "0.4.0")
-use_repo(
-    nats,
-    "nats_2_14_0_darwin_amd64",
-    "nats_2_14_0_darwin_arm64",
-    "nats_2_14_0_linux_amd64",
-    "nats_2_14_0_linux_arm64",
-)
-register_toolchains("@rules_nats//toolchain:all")
+bazel_dep(name = "rules_nats", version = "0.1.2")
 ```
 
-The `nats` extension is `mod.is_root`-guarded — only the root module's `nats.version()` tags fire — so consumers must declare it themselves rather than inheriting it from rules_nats's own `MODULE.bazel`. (The guard prevents `@nats_<ver>_<plat>` repo-name collisions when consumed transitively.) Same pattern as `rules_capsule`, `rules_temporal`, `rules_atlas`, etc.
+That's all: rules_nats's own `MODULE.bazel` pins nats-server 2.14.0 / nats CLI 0.4.0 and registers the toolchain. rules_nats is not in the BCR yet, so pin it (and `rules_kubectl`, below) with `archive_override` or `git_override`.
 
-The install primitives also require [`rules_kubectl`](https://github.com/collider-bazel-extensions/rules_kubectl) ≥ 0.2.0 (transitive — the macros are thin wrappers around `kubectl_apply`).
+To fetch another pinned version for your own targets, set it in your root module:
+
+```python
+nats = use_extension("@rules_nats//:extensions.bzl", "nats")
+nats.version(version = "2.14.0", cli_version = "0.4.0")
+use_repo(nats, "nats_2_14_0_linux_amd64")  # etc.
+```
+
+rules_nats's own `nats.version()` always applies (the toolchain uses it); the root module's tags override it per server version and may add versions; other modules' tags are ignored. Before v0.1.2 the root had to set it, or resolution failed with `does not generate repository "nats_2_14_0_linux_amd64"`; the `use_repo` / `register_toolchains` lines earlier READMEs asked for are harmless but no longer needed. Setting one server version with two CLI versions in a module, or an unsupported version, fails naming `nats.version`.
+
+The release archive (the tag tarball) leaves out `tests/` and `tools/`, whose packages load dev-only modules, so `bazel query @rules_nats//...` works for consumers. A `git_override` clone still contains them; name packages instead (for example `@rules_nats//:all`).
+
+The install primitives also require [`rules_kubectl`](https://github.com/collider-bazel-extensions/rules_kubectl) ≥ 0.2.0, a transitive dependency: the macros are thin wrappers around `kubectl_apply`. Pin it in your root module too, because rules_nats's own `git_override` for it applies only when rules_nats is the root.
 
 ## Hermetic server primitives
 
