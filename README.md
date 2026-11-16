@@ -114,3 +114,11 @@ Maintainer flow for chart bumps: edit `tools/versions.bzl`, then `tools/render_n
 - [DESIGN.md](DESIGN.md) — architecture, design tradeoffs.
 - [NATS docs](https://docs.nats.io)
 - [JetStream docs](https://docs.nats.io/nats-concepts/jetstream)
+
+---
+
+## Requesting a new rules package
+
+Want Bazel rules for another tool or service?
+[Request a rules package](https://github.com/collider-bazel-extensions/.github/issues/new?template=request-a-rules-package.yml).
+The [organization page](https://github.com/collider-bazel-extensions) lists every package.
