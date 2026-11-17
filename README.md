@@ -13,7 +13,7 @@ Bazel rules for [NATS](https://nats.io) — high-performance pub/sub + JetStream
 ## Install (Bzlmod)
 
 ```python
-bazel_dep(name = "rules_nats", version = "0.1.2")
+bazel_dep(name = "rules_nats", version = "0.1.3")
 ```
 
 That's all: rules_nats's own `MODULE.bazel` pins nats-server 2.14.0 / nats CLI 0.4.0 and registers the toolchain. rules_nats is not in the BCR yet, so pin it (and `rules_kubectl`, below) with `archive_override` or `git_override`.
@@ -122,3 +122,9 @@ Maintainer flow for chart bumps: edit `tools/versions.bzl`, then `tools/render_n
 Want Bazel rules for another tool or service?
 [Request a rules package](https://github.com/collider-bazel-extensions/.github/issues/new?template=request-a-rules-package.yml).
 The [organization page](https://github.com/collider-bazel-extensions) lists every package.
+
+## License
+
+[Apache License 2.0](LICENSE) (SPDX: `Apache-2.0`).
+
+Manifests in `private/manifests/` that are rendered from upstream charts or releases remain under their upstream projects' licences.
